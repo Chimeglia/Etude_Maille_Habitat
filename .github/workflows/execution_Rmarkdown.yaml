@@ -17,8 +17,8 @@ jobs:
           sudo dpkg -i pandoc-2.7.3-1-amd64.deb
       - name: Install R dependencies
         run: |
-          install.packages('rmarkdown')
-          # Ajoutez ici d'autres packages dont votre script a besoin
+          echo "install.packages('rmarkdown')" > install.R
+          Rscript install.R
       - name: Render R Markdown files
         run: |
           rmarkdown::render('Test_git.Rmd')
@@ -27,3 +27,4 @@ jobs:
         with:
           name: HTML report
           path: Test_git_sortie.html  # Remplacez par le nom de votre fichier de sortie si ce n'est pas 'Script_Rmd_Maille_Habitat.html'
+
