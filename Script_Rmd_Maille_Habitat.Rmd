@@ -1,7 +1,7 @@
 ---
 title: "Rapport étude Maille Habitat"
-# author: "Julien Luciani"
-# date: "2023-05-22"
+author: "Julien Luciani"
+date: "2023-10-09"
 output: 
   html_document:
     self_contained: false
@@ -152,8 +152,8 @@ Ces données portent sur les 360 communes corses pour l'année 2017. On trouve s
 - **CODGEO** : codes INSEE des communes  
 - **LIBGEO** : noms des communes  
 - **POP** : population
-- **LOG** : nombre de logements (<span style="color:red;">**Source DV3F?**</span>)
-- **tot_lgmt** : nombre de logements (<span style="color:red;">**Source FILOCOM ?**</span>)
+- **LOG** : nombre de logements (Source DV3F)
+- **tot_lgmt** : nombre de logements (Source FILOCOM)
 - **nb_mut** : nombre de transactions dans l’ancien
 - **RP** : nombre de résidences principales
 - **RSECOCC** : nombre de résidences secondaires
