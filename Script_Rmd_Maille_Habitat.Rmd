@@ -657,7 +657,7 @@ On crée la table `carteMailles` comportant les données spatiales des mailles :
 
 <br>
 
-#### Carte de la carte des mailles
+#### Carte des mailles
 
 
 ```{r trace_carteMaille1, echo=F,fig.align='center',fig.show='hold' ,fig.width = 9, fig.height = 9, include=FALSE}
@@ -925,7 +925,7 @@ Le nombre de mailles et la population minimale des mailles doivent être défini
 
 <br>
 
-```{r traceSecteurs_diff, echo=T, eval=F ,fig.align='center',fig.show='hold' ,fig.width = 9, fig.height = 9}
+```{r traceSecteurs_diff, echo=T, eval=F ,fig.align='center',fig.show='hold' ,fig.width = 9, fig.height = 9, eval=F}
 #nb_mailles=36
 #population_min=2500
 
@@ -958,9 +958,7 @@ carte=carteCommunes %>%
 carte
 ```
 
-<br>
-*Cliquer sur l'image pour afficher la carte interactive*
-<a href="Cartes_Interactives/carte_interactive_5.html" target="_blank"><img src="Cartes_Interactives/carte5.png" alt=" "></a>
+
 
 <br>
 <br>
