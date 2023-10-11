@@ -201,7 +201,7 @@ Ensuite, en construit la table `airDNA` dans laquelle on ne conserve que les col
 Enfin,  on ajoute la colonne *Loc.actives* à la table `Donnees_Logement_2017` en effectuant une jointure par code INSEE à l'aide de la fonction `inner_join` (package `dplyr`).  
 
 <br>
-<span style="color:red"><strong>Note : </strong> l'étude du CGDD comporte une erreur dans les données AirDNA : le taux de locations de touristiques apparaît à 0 % au lieu de 17,5 %. Le présent script utilise la même valeur erronée (0 %) afin de retrouver les mêmes résultats que le CGDD. Cette valeur à été modifiée directement dans le fichier Excel source : "Données/stat_airdna_aout2020_mod.xlsx" </span>
+<span style="color:red"><strong>Note : </strong> l'étude du CGDD comporte une erreur dans les données AirDNA : le taux de locations touristiques apparaît à 0 % au lieu de 17,5 % sur la commune de Calcatoggio. Le présent script utilise la même valeur erronée (0 %) afin de retrouver les mêmes résultats que le CGDD. Cette valeur à été modifiée directement dans le fichier Excel source : "Données/stat_airdna_aout2020_mod.xlsx" </span>
 
 <br>
 
@@ -1106,7 +1106,7 @@ webshot("Cartes_Interactives/carte_interactive_6.html", file = "Cartes_Interacti
 
 <br>
 
-## Sectorisation sans maillage préalable
+## Modifications du script n°2 : sectorisation sans maillage préalable
 
 ### Suppression des mailles : essai 1
   
@@ -1318,8 +1318,115 @@ webshot("Cartes_Interactives/carte_interactive_8.html", file = "Cartes_Interacti
 
 <br>
 
+### Suppression des mailles : essai 3
 
-## Modifications du script n°2
+
+Dans cet essai on réalise le regroupement hiérarchique sur 5 secteurs.
+
+
+Synthèse des modifications : 
+
+- Suppression de la winsorisation
+- Correction de l'erreur dans les données AirDNA
+- Sectorisation sans maillage préalable
+- Ajout de la population dans les données d'entrée
+- Ajout d'un 5 ème secteur
+
+
+```{r sectorisationSansMaillage_Pop_5secteurs,echo=F, eval=T, results=F, include = F}
+rm(list=ls())
+
+
+
+library(tidyverse)
+library(FactoMineR)
+library(spdep)
+library(sf)
+library(readxl)
+library(leaflet)
+library(htmlwidgets)
+load("Données/Donnees_Logement_2017.RData")
+importsAirDNA <- read_excel("Données/stat_airdna_aout2020_corr.xlsx", range = "A4:I364")
+Import_carteCommunesCorses=st_read("Données/SHP_COMMUNES/COMMUNE.shp")
+carteCommunesCorses=Import_carteCommunesCorses %>% select(INSEE_COM,geometry)
+colnames(carteCommunesCorses)[1]="CODGEO"
+carteCommunesCorses=carteCommunesCorses %>% arrange(CODGEO)
+carteCommunesCorses <- st_transform(carteCommunesCorses, crs = 4326)
+airDNA=importsAirDNA %>% select(2,4)
+colnames(airDNA)=c("CODGEO","Loc.actives")
+Donnees_Logement_2017=Donnees_Logement_2017 %>% inner_join(airDNA, by="CODGEO")
+Indicateurs_parCommune= Donnees_Logement_2017 %>% 
+  mutate(indic.transac = round(100 * nb_mut / LOG, 1),
+         indic.menag = round(POP/RP, 1),
+         indic.rs = round(100 * RSECOCC / LOG, 1),
+         indic.lv = round(100 * LOGVAC / LOG, 1),
+         indic.jeun = round(jeun / anc, 1),
+         indic.social = round(100 * social / tot_lgmt, 1),
+         indic.prop = round(100 * proprietaire / tot_lgmt, 1),
+         indic.duroc = duroc,
+         indic.prix = round(100 * moyenne_prix/rev_ucm, 1),
+         indic.airbnb=round(100*Loc.actives/LOG, 1),
+         indic.population=POP) %>%
+  select(CODGEO,LIBGEO,POP,LOG,contains("indic"))
+Indicateurs_parCommune=Indicateurs_parCommune %>% mutate_if(is.numeric, funs(ifelse(is.na(.), 0, .)))
+
+listeIndicateurs=Indicateurs_parCommune %>% select(contains("indic")) %>% names()
+Indicateurs_parCommune_valeurs=Indicateurs_parCommune[listeIndicateurs] 
+
+# carteCommunesCorses_spdf=carteCommunesCorses %>% left_join(Indicateurs_parCommune,by="CODGEO")%>% select(CODGEO,LIBGEO,POP) %>%  as("Spatial")
+# table_voisinage=poly2nb(carteCommunesCorses_spdf,queen=F)
+
+
+ACP_parCommunes <- Indicateurs_parCommune_valeurs %>%  PCA(graph = F,ncp=5)
+
+
+
+
+hc5_communes <- HCPC(ACP_parCommunes, nb.clust = 5, consol = T, graph = F)
+cl5_communes <- data.frame(CODGEO = Indicateurs_parCommune$CODGEO, cl_maille5 = hc5_communes$data.clust[,"clust"])
+
+
+carteCommunesSecteurs <- left_join(carteCommunesCorses, cl5_communes, by = "CODGEO")
+
+
+carteCommunesCorses_merged <- left_join(carteCommunesCorses, Donnees_Logement_2017, by = "CODGEO")
+carteCommunesCorses_sf <- st_as_sf(carteCommunesCorses_merged)
+
+# Simplifier les données géographiques
+carteCommunesSecteurs_simplified <- ms_simplify(carteCommunesSecteurs)
+
+# Création d'une palette de couleurs pour les secteurs
+palSecteurs = colorFactor(palette = c("seagreen3", "orange2","blueviolet", "deeppink"), domain = carteCommunesSecteurs$cl_maille4)
+
+# Création d'une carte des communes avec un trait gris fin
+carteSecteursCommunes = leaflet(carteCommunesCorses_sf) %>%
+  addPolygons(fillColor = "white",
+              fillOpacity = 0.8,
+              color = "gray",
+              weight = 1)
+
+# Ajout des mailles avec un trait noir plus épais et colorées selon le secteur
+carte8b=carteSecteursCommunes %>%
+  addPolygons(data = carteCommunesSecteurs_simplified,
+              fillColor = ~palSecteurs(cl_maille5),
+              fillOpacity = 0.8,
+              color = "black",
+              weight = 2)
+widget_file8b <- "Cartes_Interactives/carte_interactive_8b.html"
+saveWidget(carte8b, file = widget_file8b)
+webshot("Cartes_Interactives/carte_interactive_8b.html", file = "Cartes_Interactives/carte8b.png",vwidth = 860, vheight = 860)
+
+
+```
+
+
+<br>
+*Cliquer sur l'image pour afficher la carte interactive*
+<a href="Cartes_Interactives/carte_interactive_8b.html" target="_blank"><img src="Cartes_Interactives/carte8b.png" alt=" "></a>
+
+<br>
+
+## Modifications du script n°3
 
 ### Essai 36 mailles 
 
@@ -1365,7 +1472,8 @@ Indicateurs_parCommune= Donnees_Logement_2017 %>%
          indic.prop = round(100 * proprietaire / tot_lgmt, 1),
          indic.duroc = duroc,
          indic.prix = round(100 * moyenne_prix/rev_ucm, 1),
-         indic.airbnb=round(100*Loc.actives/LOG, 1)) %>% 
+         indic.airbnb=round(100*Loc.actives/LOG, 1),
+         indic.pop=POP) %>% 
   select(CODGEO,LIBGEO,POP,LOG,contains("indic"))
 Indicateurs_parCommune=Indicateurs_parCommune %>% mutate_if(is.numeric, funs(ifelse(is.na(.), 0, .)))
 
@@ -1401,7 +1509,8 @@ Indicateurs_parMaille=Maillage %>%
          indic.prop = round(100 * proprietaire / tot_lgmt, 1),
          indic.duroc = duroc,
          indic.prix = round(100 * moyenne_prix/rev_ucm, 1),
-         indic.airbnb=round(100*Loc.actives/LOG, 1)) %>% 
+         indic.airbnb=round(100*Loc.actives/LOG, 1),
+         indic.pop=POP) %>% 
   select(maille,POP,LOG,contains("indic")) %>% 
   mutate_if(is.numeric, funs(ifelse(is.na(.), 0, .)))
 
@@ -1495,7 +1604,8 @@ Indicateurs_parCommune= Donnees_Logement_2017 %>%
          indic.prop = round(100 * proprietaire / tot_lgmt, 1),
          indic.duroc = duroc,
          indic.prix = round(100 * moyenne_prix/rev_ucm, 1),
-         indic.airbnb=round(100*Loc.actives/LOG, 1)) %>% 
+         indic.airbnb=round(100*Loc.actives/LOG, 1),
+         indic.pop=POP) %>% 
   select(CODGEO,LIBGEO,POP,LOG,contains("indic"))
 Indicateurs_parCommune=Indicateurs_parCommune %>% mutate_if(is.numeric, funs(ifelse(is.na(.), 0, .)))
 
@@ -1531,7 +1641,8 @@ Indicateurs_parMaille=Maillage %>%
          indic.prop = round(100 * proprietaire / tot_lgmt, 1),
          indic.duroc = duroc,
          indic.prix = round(100 * moyenne_prix/rev_ucm, 1),
-         indic.airbnb=round(100*Loc.actives/LOG, 1)) %>% 
+         indic.airbnb=round(100*Loc.actives/LOG, 1),
+         indic.pop=POP) %>% 
   select(maille,POP,LOG,contains("indic")) %>% 
   mutate_if(is.numeric, funs(ifelse(is.na(.), 0, .)))
 
